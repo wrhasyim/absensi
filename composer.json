@@ -1,0 +1,13 @@
+{
+    "name": "absensi/sekolah",
+    "description": "Sistem Absensi",
+    "require": {
+        "jmrashed/zkteco": "*"
+    },
+    "authors": [
+        {
+            "name": "emergent-agent-e1",
+            "email": "github@emergent.sh"
+        }
+    ]
+}

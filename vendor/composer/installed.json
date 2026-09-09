@@ -1,0 +1,56 @@
+{
+    "packages": [
+        {
+            "name": "jmrashed/zkteco",
+            "version": "2.1.0",
+            "version_normalized": "2.1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jmrashed/zkteco.git",
+                "reference": "06873e6fedb44a302fcb147526ce1ed176f6aa86"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jmrashed/zkteco/zipball/06873e6fedb44a302fcb147526ce1ed176f6aa86",
+                "reference": "06873e6fedb44a302fcb147526ce1ed176f6aa86",
+                "shasum": ""
+            },
+            "require": {
+                "ext-sockets": "*",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.0",
+                "orchestra/testbench": "^9.0",
+                "phpstan/phpstan": "^1.12",
+                "phpunit/phpunit": "^10.0"
+            },
+            "time": "2026-07-25T17:47:23+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "Jmrashed\\Zkteco\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Md Rasheduzzaman",
+                    "email": "jmrashed@gmail.com"
+                }
+            ],
+            "description": "ZKTeco Package For Laravel. This package provides seamless integration with ZKTeco devices within Laravel applications, enabling communication with attendance devices such as fingerprint, face recognition, or RFID using UDP protocol.",
+            "support": {
+                "issues": "https://github.com/jmrashed/zkteco/issues",
+                "source": "https://github.com/jmrashed/zkteco/tree/v2.1.0"
+            },
+            "install-path": "../jmrashed/zkteco"
+        }
+    ],
+    "dev": true,
+    "dev-package-names": []
+}
