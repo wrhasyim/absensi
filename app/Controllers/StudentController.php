@@ -125,24 +125,20 @@ class StudentController extends Controller {
                         $tanggal_lahir = trim($sheetData[$i]['G'] ?? '') ?: null;
                         $tahun_masuk = trim($sheetData[$i]['H'] ?? '') ?: null;
                         
-                        // --- PENCOCOKAN OTOMATIS KELAS BERDASARKAN NAMA ---
+                        // Pencocokan otomatis Kelas
                         $input_kelas = trim($sheetData[$i]['I'] ?? '');
                         $class_id = null;
                         if (!empty($input_kelas)) {
                             $kelasData = Database::fetch("SELECT id FROM classes WHERE name LIKE ? OR id = ?", ["%$input_kelas%", $input_kelas]);
-                            if ($kelasData) {
-                                $class_id = $kelasData['id'];
-                            }
+                            if ($kelasData) { $class_id = $kelasData['id']; }
                         }
 
-                        // --- PENCOCOKAN OTOMATIS JURUSAN BERDASARKAN NAMA/KODE ---
+                        // Pencocokan otomatis Jurusan
                         $input_jurusan = trim($sheetData[$i]['J'] ?? '');
                         $major_id = null;
                         if (!empty($input_jurusan)) {
                             $jurusanData = Database::fetch("SELECT id FROM majors WHERE name LIKE ? OR code LIKE ? OR id = ?", ["%$input_jurusan%", "%$input_jurusan%", $input_jurusan]);
-                            if ($jurusanData) {
-                                $major_id = $jurusanData['id'];
-                            }
+                            if ($jurusanData) { $major_id = $jurusanData['id']; }
                         }
 
                         $fingerprint_id = trim($sheetData[$i]['K'] ?? '') ?: null;
@@ -160,24 +156,33 @@ class StudentController extends Controller {
                         $guardian_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['U'] ?? ''));
                         $primary_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['V'] ?? ''));
                         $relation = trim($sheetData[$i]['W'] ?? '') ?: 'Orang Tua';
-                        $status_ortu = trim($sheetData[$i]['X'] ?? '') ?: 'Aktif';
+                        $is_active_ortu = (strtolower(trim($sheetData[$i]['X'] ?? '')) === 'nonaktif') ? 0 : 1;
 
                         $parent_id = null;
 
-                        // Insert data Orang Tua jika WA Utama diisi
+                        // Cek dan Simpan / Hubungkan Data Orang Tua
                         if (!empty($primary_wa)) {
                             try {
-                                $parent_id = Database::insert('parents', [
-                                    'father_name' => $father_name,
-                                    'father_whatsapp' => $father_wa,
-                                    'mother_name' => $mother_name,
-                                    'mother_whatsapp' => $mother_wa,
-                                    'guardian_name' => $guardian_name,
-                                    'guardian_whatsapp' => $guardian_wa,
-                                    'primary_whatsapp' => $primary_wa,
-                                    'relation' => $relation,
-                                    'status' => $status_ortu
-                                ]);
+                                // Cek apakah nomor WA utama sudah terdaftar di tabel parents
+                                $existingParent = Database::fetch("SELECT id FROM parents WHERE primary_whatsapp = ?", [$primary_wa]);
+                                
+                                if ($existingParent) {
+                                    // Jika sudah ada, gunakan ID yang lama
+                                    $parent_id = $existingParent['id'];
+                                } else {
+                                    // Jika belum ada, buat baru
+                                    $parent_id = Database::insert('parents', [
+                                        'father_name' => $father_name,
+                                        'father_whatsapp' => $father_wa,
+                                        'mother_name' => $mother_name,
+                                        'mother_whatsapp' => $mother_wa,
+                                        'guardian_name' => $guardian_name,
+                                        'guardian_whatsapp' => $guardian_wa,
+                                        'primary_whatsapp' => $primary_wa,
+                                        'relation' => $relation,
+                                        'is_active' => $is_active_ortu
+                                    ]);
+                                }
                             } catch (\Throwable $e) {
                                 $lastError = "Ortu: " . $e->getMessage();
                             }
@@ -215,7 +220,7 @@ class StudentController extends Controller {
                     if ($gagal > 0) {
                         flash('error', "Berhasil: $berhasil. Gagal: $gagal baris. Cek Error Terakhir: " . $lastError);
                     } else {
-                        flash('success', "Import selesai! Berhasil menyimpan $berhasil siswa.");
+                        flash('success', "Import selesai! Berhasil menyimpan $berhasil siswa beserta data orang tua.");
                     }
                     
                 } catch (\Throwable $e) {
