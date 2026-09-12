@@ -34,6 +34,7 @@ $router->post('/students/store', [\App\Controllers\StudentController::class, 'st
 $router->get('/students/{id}/edit', [\App\Controllers\StudentController::class, 'edit']);
 $router->post('/students/{id}/update', [\App\Controllers\StudentController::class, 'update']);
 $router->post('/students/{id}/delete', [\App\Controllers\StudentController::class, 'delete']);
+$router->post('/students/import', [\App\Controllers\StudentController::class, 'importExcel']);
 
 // Parents
 $router->get('/parents', [\App\Controllers\ParentController::class, 'index']);
