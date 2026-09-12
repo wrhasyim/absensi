@@ -2,7 +2,8 @@
     "name": "absensi/sekolah",
     "description": "Sistem Absensi",
     "require": {
-        "jmrashed/zkteco": "*"
+        "jmrashed/zkteco": "*",
+        "phpoffice/phpspreadsheet": "^5.9"
     },
     "authors": [
         {

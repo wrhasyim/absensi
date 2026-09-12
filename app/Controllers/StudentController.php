@@ -5,6 +5,7 @@ use App\Core\Controller;
 use App\Core\Database;
 use App\Core\Auth;
 use App\Core\Csrf;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class StudentController extends Controller {
     public function index() {
@@ -88,6 +89,150 @@ class StudentController extends Controller {
         Database::query("DELETE FROM students WHERE id=?", [$id]);
         Auth::logActivity('delete_student', "ID: $id");
         flash('success', 'Siswa dihapus.');
+        redirect('/students');
+    }
+
+    public function importExcel() {
+        Auth::require(['super_admin', 'admin']);
+        Csrf::verify();
+
+        if (isset($_FILES['file_excel']['name']) && $_FILES['file_excel']['error'] === UPLOAD_ERR_OK) {
+            $file_tmp = $_FILES['file_excel']['tmp_name'];
+            $extension = pathinfo($_FILES['file_excel']['name'], PATHINFO_EXTENSION);
+
+            if (in_array($extension, ['xls', 'xlsx'])) {
+                try {
+                    $spreadsheet = IOFactory::load($file_tmp);
+                    $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+                    $berhasil = 0;
+                    $gagal = 0;
+                    $lastError = "";
+
+                    for ($i = 2; $i <= count($sheetData); $i++) {
+                        $nis = trim($sheetData[$i]['A'] ?? '');
+                        $nama_lengkap = trim($sheetData[$i]['C'] ?? '');
+                        
+                        // Lewati jika NIS atau Nama Lengkap kosong
+                        if (empty($nis) || empty($nama_lengkap)) {
+                            continue;
+                        }
+
+                        $nisn = trim($sheetData[$i]['B'] ?? '');
+                        $nama_panggilan = trim($sheetData[$i]['D'] ?? '');
+                        $jenis_kelamin = (strtoupper(trim($sheetData[$i]['E'] ?? '')) === 'P') ? 'P' : 'L';
+                        $tempat_lahir = trim($sheetData[$i]['F'] ?? '');
+                        $tanggal_lahir = trim($sheetData[$i]['G'] ?? '') ?: null;
+                        $tahun_masuk = trim($sheetData[$i]['H'] ?? '') ?: null;
+                        
+                        // Pencocokan otomatis Kelas
+                        $input_kelas = trim($sheetData[$i]['I'] ?? '');
+                        $class_id = null;
+                        if (!empty($input_kelas)) {
+                            $kelasData = Database::fetch("SELECT id FROM classes WHERE name LIKE ? OR id = ?", ["%$input_kelas%", $input_kelas]);
+                            if ($kelasData) { $class_id = $kelasData['id']; }
+                        }
+
+                        // Pencocokan otomatis Jurusan
+                        $input_jurusan = trim($sheetData[$i]['J'] ?? '');
+                        $major_id = null;
+                        if (!empty($input_jurusan)) {
+                            $jurusanData = Database::fetch("SELECT id FROM majors WHERE name LIKE ? OR code LIKE ? OR id = ?", ["%$input_jurusan%", "%$input_jurusan%", $input_jurusan]);
+                            if ($jurusanData) { $major_id = $jurusanData['id']; }
+                        }
+
+                        $fingerprint_id = trim($sheetData[$i]['K'] ?? '') ?: null;
+                        $status_siswa = trim($sheetData[$i]['L'] ?? '') ?: 'aktif';
+                        $phone = trim($sheetData[$i]['M'] ?? '');
+                        $whatsapp = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['N'] ?? ''));
+                        $address = trim($sheetData[$i]['O'] ?? '');
+
+                        // Data Orang Tua
+                        $father_name = trim($sheetData[$i]['P'] ?? '');
+                        $father_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['Q'] ?? ''));
+                        $mother_name = trim($sheetData[$i]['R'] ?? '');
+                        $mother_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['S'] ?? ''));
+                        $guardian_name = trim($sheetData[$i]['T'] ?? '');
+                        $guardian_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['U'] ?? ''));
+                        $primary_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['V'] ?? ''));
+                        $relation = trim($sheetData[$i]['W'] ?? '') ?: 'Orang Tua';
+                        $is_active_ortu = (strtolower(trim($sheetData[$i]['X'] ?? '')) === 'nonaktif') ? 0 : 1;
+
+                        $parent_id = null;
+
+                        // Cek dan Simpan / Hubungkan Data Orang Tua
+                        if (!empty($primary_wa)) {
+                            try {
+                                // Cek apakah nomor WA utama sudah terdaftar di tabel parents
+                                $existingParent = Database::fetch("SELECT id FROM parents WHERE primary_whatsapp = ?", [$primary_wa]);
+                                
+                                if ($existingParent) {
+                                    // Jika sudah ada, gunakan ID yang lama
+                                    $parent_id = $existingParent['id'];
+                                } else {
+                                    // Jika belum ada, buat baru
+                                    $parent_id = Database::insert('parents', [
+                                        'father_name' => $father_name,
+                                        'father_whatsapp' => $father_wa,
+                                        'mother_name' => $mother_name,
+                                        'mother_whatsapp' => $mother_wa,
+                                        'guardian_name' => $guardian_name,
+                                        'guardian_whatsapp' => $guardian_wa,
+                                        'primary_whatsapp' => $primary_wa,
+                                        'relation' => $relation,
+                                        'is_active' => $is_active_ortu
+                                    ]);
+                                }
+                            } catch (\Throwable $e) {
+                                $lastError = "Ortu: " . $e->getMessage();
+                            }
+                        }
+
+                        // Insert data Siswa
+                        try {
+                            Database::insert('students', [
+                                'nis' => $nis,
+                                'nisn' => $nisn,
+                                'name' => $nama_lengkap,
+                                'nickname' => $nama_panggilan,
+                                'gender' => $jenis_kelamin,
+                                'birth_place' => $tempat_lahir,
+                                'birth_date' => $tanggal_lahir,
+                                'entry_year' => $tahun_masuk,
+                                'class_id' => $class_id,
+                                'major_id' => $major_id,
+                                'fingerprint_id' => $fingerprint_id,
+                                'status' => $status_siswa,
+                                'phone' => $phone,
+                                'whatsapp' => $whatsapp,
+                                'parent_id' => $parent_id,
+                                'address' => $address
+                            ]);
+                            $berhasil++;
+                        } catch (\Throwable $e) {
+                            $gagal++;
+                            $lastError = "Siswa (NIS $nis): " . $e->getMessage();
+                        }
+                    }
+
+                    Auth::logActivity('import_students', "Berhasil: $berhasil, Gagal: $gagal");
+                    
+                    if ($gagal > 0) {
+                        flash('error', "Berhasil: $berhasil. Gagal: $gagal baris. Cek Error Terakhir: " . $lastError);
+                    } else {
+                        flash('success', "Import selesai! Berhasil menyimpan $berhasil siswa beserta data orang tua.");
+                    }
+                    
+                } catch (\Throwable $e) {
+                    flash('error', "Terjadi kesalahan sistem saat membaca file: " . $e->getMessage());
+                }
+            } else {
+                flash('error', "Format file tidak didukung. Harap gunakan format .xlsx atau .xls");
+            }
+        } else {
+            flash('error', "Gagal mengunggah file.");
+        }
+        
         redirect('/students');
     }
 
