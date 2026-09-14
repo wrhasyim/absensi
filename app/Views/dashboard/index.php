@@ -59,13 +59,15 @@
         <?php else: foreach ($recent as $r): ?>
           <tr>
             <td><?= e(substr($r['time_in'] ?? '', 0, 5)) ?></td>
-            <td><?= e($r['nis']) ?></td>
+            <!-- Menggunakan 'identifier' dari controller -->
+            <td><?= e($r['identifier']) ?></td>
             <td>
-              <?= e($r['student_name']) ?><br>
+              <!-- Menggunakan 'user_name' dari controller -->
+              <?= e($r['user_name']) ?><br>
               <small class="badge <?= ($r['role'] ?? '') === 'Guru' ? 'bg-primary' : 'bg-secondary' ?>"><?= e($r['role'] ?? 'Siswa') ?></small>
             </td>
             <td><?= e($r['class_name']) ?></td>
-            <td><span class="badge-status st-<?= e($r['status']) ?>"><?= strtoupper(e($r['status'])) ?></span></td>
+            <td><span class="badge-status st-<?= e($r['status'] ?? '') ?>"><?= strtoupper(e($r['status'] ?? '')) ?></span></td>
           </tr>
         <?php endforeach; endif; ?>
         </tbody>
