@@ -1,5 +1,7 @@
+<?php use App\Core\Csrf; ?>
 <div class="stat-grid">
   <div class="stat primary"><i class="bi bi-people icon"></i><div class="label">Total Siswa</div><div class="value" data-testid="stat-total-siswa"><?= $stats['total_siswa'] ?></div><div class="foot">Siswa aktif</div></div>
+  <div class="stat primary" style="border-left-color: #38bdf8;"><i class="bi bi-person-badge icon"></i><div class="label">Total Guru</div><div class="value"><?= $stats['total_guru'] ?></div><div class="foot">Guru terdaftar</div></div>
   <div class="stat success"><i class="bi bi-check2-circle icon"></i><div class="label">Hadir Hari Ini</div><div class="value" data-testid="stat-hadir"><?= $stats['hadir'] ?></div><div class="foot">Sudah absen</div></div>
   <div class="stat warning"><i class="bi bi-alarm icon"></i><div class="label">Terlambat</div><div class="value" data-testid="stat-terlambat"><?= $stats['terlambat'] ?></div><div class="foot">Lewat toleransi</div></div>
   <div class="stat info"><i class="bi bi-file-medical icon"></i><div class="label">Izin/Sakit</div><div class="value" data-testid="stat-izin-sakit"><?= $stats['izin'] + $stats['sakit'] ?></div><div class="foot">I:<?= $stats['izin'] ?> S:<?= $stats['sakit'] ?></div></div>
@@ -50,7 +52,7 @@
         <a href="<?= url('/attendance/monitor') ?>" class="btn btn-sm btn-outline-primary">Monitor Realtime</a>
       </div>
       <div class="table-responsive"><table class="table table-hover mb-0">
-        <thead><tr><th>Jam</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Status</th></tr></thead>
+        <thead><tr><th>Jam</th><th>NIS / NIP</th><th>Nama Pengguna</th><th>Kelas / Peran</th><th>Status</th></tr></thead>
         <tbody data-testid="dashboard-recent">
         <?php if (empty($recent)): ?>
           <tr><td colspan="5" class="text-center py-4 text-muted">Belum ada absensi hari ini.</td></tr>
@@ -58,7 +60,10 @@
           <tr>
             <td><?= e(substr($r['time_in'] ?? '', 0, 5)) ?></td>
             <td><?= e($r['nis']) ?></td>
-            <td><?= e($r['student_name']) ?></td>
+            <td>
+              <?= e($r['student_name']) ?><br>
+              <small class="badge <?= ($r['role'] ?? '') === 'Guru' ? 'bg-primary' : 'bg-secondary' ?>"><?= e($r['role'] ?? 'Siswa') ?></small>
+            </td>
             <td><?= e($r['class_name']) ?></td>
             <td><span class="badge-status st-<?= e($r['status']) ?>"><?= strtoupper(e($r['status'])) ?></span></td>
           </tr>
