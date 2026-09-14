@@ -93,4 +93,12 @@ $router->get('/system/health', [\App\Controllers\ReportController::class, 'healt
 $router->get('/settings', [\App\Controllers\ReportController::class, 'settings']);
 $router->post('/settings/save', [\App\Controllers\ReportController::class, 'settingsSave']);
 
+// Data Pimpinan (Kepsek & Wakasek)
+$router->get('/leaders', [\App\Controllers\LeaderController::class, 'index']);
+$router->get('/leaders/create', [\App\Controllers\LeaderController::class, 'create']);
+$router->post('/leaders/store', [\App\Controllers\LeaderController::class, 'store']);
+$router->get('/leaders/{id}/edit', [\App\Controllers\LeaderController::class, 'edit']);
+$router->post('/leaders/{id}/update', [\App\Controllers\LeaderController::class, 'update']);
+$router->post('/leaders/{id}/delete', [\App\Controllers\LeaderController::class, 'delete']);
+
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
