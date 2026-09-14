@@ -1,4 +1,52 @@
-<div class="card mb-3"><div class="card-body">
+<style>
+/* --- GAYA KHUSUS UNTUK CETAK (PRINT) --- */
+@media print {
+    /* 1. Sembunyikan elemen web yang tidak perlu dicetak */
+    .no-print, .navbar, .sidebar, .btn, footer {
+        display: none !important;
+    }
+
+    /* 2. Hilangkan border kotak dan lebarkan ke seluruh kertas */
+    body, .main-content, .container, .container-fluid {
+        width: 100% !important; margin: 0 !important; padding: 0 !important;
+        background-color: #fff !important; box-shadow: none !important;
+    }
+    .card {
+        border: none !important; box-shadow: none !important;
+    }
+
+    /* 3. Rapikan tabel agar garisnya hitam tegas */
+    .table {
+        width: 100% !important; border-collapse: collapse !important; margin-bottom: 20px !important;
+    }
+    .table th, .table td {
+        border: 1px solid #000 !important; padding: 8px !important; 
+        font-size: 12px !important; color: #000 !important;
+    }
+    .table th {
+        background-color: #f2f2f2 !important; 
+        -webkit-print-color-adjust: exact; 
+    }
+    .badge-status {
+        border: none !important; color: #000 !important; background: transparent !important; font-weight: bold;
+    }
+
+    /* 4. Tampilkan elemen yang khusus untuk cetak */
+    .print-only {
+        display: block !important;
+    }
+}
+
+/* Sembunyikan Kop & TTD di layar web biasa */
+@media screen {
+    .print-only {
+        display: none !important;
+    }
+}
+</style>
+
+<!-- Form Filter (Akan disembunyikan saat dicetak) -->
+<div class="card mb-3 no-print"><div class="card-body">
 <form method="GET" class="d-flex gap-2 align-items-end">
   <div>
     <label class="form-label">Tanggal</label>
@@ -18,7 +66,8 @@
 </form>
 </div></div>
 
-<div class="row g-2 mb-3">
+<!-- Kartu Rekap (Akan disembunyikan saat dicetak agar rapi) -->
+<div class="row g-2 mb-3 no-print">
   <div class="col"><div class="stat success"><div class="label">Hadir</div><div class="value"><?= $summary['hadir'] ?? 0 ?></div></div></div>
   <div class="col"><div class="stat warning"><div class="label">Terlambat</div><div class="value"><?= $summary['terlambat'] ?? 0 ?></div></div></div>
   <div class="col"><div class="stat info"><div class="label">Izin</div><div class="value"><?= $summary['izin'] ?? 0 ?></div></div></div>
@@ -27,6 +76,15 @@
   <div class="col"><div class="stat danger"><div class="label">Belum Absen</div><div class="value"><?= $summary['belum_absen'] ?? 0 ?></div></div></div>
 </div>
 
+<!-- KOP SURAT (Hanya muncul saat dicetak) -->
+<div class="print-only" style="text-align: center; margin-bottom: 20px;">
+    <h3 style="margin: 0; font-size: 18px;">SMK TARUNA KARYA MANDIRI</h3>
+    <h2 style="margin: 5px 0; font-size: 22px;">LAPORAN KEHADIRAN HARIAN <?= strtoupper($role ?? 'siswa') ?></h2>
+    <p style="margin: 0; font-size: 14px;">Tanggal: <?= date('d F Y', strtotime($date ?? date('Y-m-d'))) ?></p>
+    <hr style="border: 1px solid #000; margin-top: 15px;">
+</div>
+
+<!-- Tabel Data -->
 <div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
 <thead>
   <tr>
@@ -55,3 +113,12 @@
 <?php endif; ?>
 </tbody>
 </table></div></div>
+
+<!-- TANDA TANGAN (Hanya muncul saat dicetak) -->
+<div class="print-only" style="width: 100%; margin-top: 40px; page-break-inside: avoid;">
+    <div style="float: right; text-align: center; width: 250px;">
+        <p style="margin-bottom: 70px;">Ciamis, <?= date('d F Y', strtotime($date ?? date('Y-m-d'))) ?><br>Kepala Sekolah,</p>
+        <p><strong>( .............................................. )</strong><br>NIP. ....................................</p>
+    </div>
+    <div style="clear: both;"></div>
+</div>

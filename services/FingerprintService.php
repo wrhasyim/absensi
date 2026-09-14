@@ -36,25 +36,22 @@ class FingerprintService {
             return ['success' => false, 'message' => 'Gagal terhubung ke perangkat fingerprint.'];
         }
 
-        // 1. Tambahkan waktu agar sistem tidak mati (Timeout) saat menyedot ribuan data
         set_time_limit(300); 
 
         $logs = $adapter->getAttendanceLogs();
         $adapter->disconnect();
 
-        // 2. Cegah Error (Crash) jika mesin gagal mengirim data
         if (!is_array($logs)) {
             return ['success' => false, 'message' => 'Gagal menarik log. Koneksi terputus atau memori mesin X100C kepenuhan.'];
         }
 
         $newLogsCount = 0; $duplicateLogsCount = 0; $attendancesProcessed = 0; $waQueueCount = 0;
-        $today = date('Y-m-d'); // Dapatkan tanggal hari ini
+        $today = date('Y-m-d'); 
 
         foreach ($logs as $log) {
             $fpId = $log['fingerprint_id'] ?? null;
             $timestamp = $log['timestamp'] ?? null;
             
-            // 3. Abaikan data korup dengan tahun 0000-00-00
             if (!$fpId || !$timestamp || $timestamp === '0000-00-00 00:00:00') continue;
 
             $parsedTime = strtotime($timestamp);
@@ -63,13 +60,14 @@ class FingerprintService {
             $logDate = date('Y-m-d', $parsedTime);
             $logTime = date('H:i:s', $parsedTime);
 
-            // CEK STATUS: APAKAH INI SISWA ATAU GURU?
-            $student = Database::fetch("SELECT id, class_id, name, whatsapp, parent_id FROM students WHERE fingerprint_id = ? AND status = 'aktif'", [$fpId]);
-            $teacher = null;
+            // PENCARIAN GURU & SISWA DENGAN PELINDUNG PHP 8
+            $studentRes = Database::fetch("SELECT id, class_id, name, whatsapp, parent_id FROM students WHERE fingerprint_id = ? AND status = 'aktif'", [$fpId]);
+            $student = is_array($studentRes) ? $studentRes : null;
             
+            $teacher = null;
             if (!$student) {
-                // Jika bukan siswa, cari di tabel guru
-                $teacher = Database::fetch("SELECT id, name, phone as whatsapp, leader_id FROM teachers WHERE fingerprint_id = ?", [$fpId]);
+                $teacherRes = Database::fetch("SELECT id, name, phone as whatsapp, leader_id FROM teachers WHERE fingerprint_id = ?", [$fpId]);
+                $teacher = is_array($teacherRes) ? $teacherRes : null;
             }
 
             if (!$student && !$teacher) continue;
@@ -77,7 +75,7 @@ class FingerprintService {
             $studentId = $student ? $student['id'] : null;
             $teacherId = $teacher ? $teacher['id'] : null;
 
-            // SIMPAN LOG KE DALAM DATABASE
+            // SIMPAN LOG
             $existingLog = Database::fetch("SELECT id FROM fingerprint_logs WHERE device_id = ? AND fingerprint_id = ? AND log_datetime = ?", [$this->device['id'], $fpId, $timestamp]);
 
             if (!$existingLog) {
@@ -95,11 +93,10 @@ class FingerprintService {
                 $newLogsCount++;
             } else {
                 $duplicateLogsCount++;
-                // Update synced_at meskipun duplikat agar kelihatan mesin masih berkomunikasi
                 Database::update('fingerprint_logs', ['synced_at' => date('Y-m-d H:i:s')], 'id = :id', ['id' => $existingLog['id']]);
             }
 
-            // PROSES ABSENSI & WHATSAPP - HANYA MEMPROSES UNTUK HARI INI
+            // PROSES ABSENSI UNTUK HARI INI
             if ($logDate === $today) {
                 $attResult = $this->processAttendance($student, $teacher, $logDate, $logTime);
                 if ($attResult['processed']) {
@@ -109,7 +106,6 @@ class FingerprintService {
             }
         }
 
-        // Update Waktu Last Sync secara paksa
         Database::update('devices', ['last_sync' => date('Y-m-d H:i:s'), 'status' => 'online'], 'id = :id', ['id' => $this->device['id']]);
 
         return [
@@ -124,33 +120,35 @@ class FingerprintService {
         ];
     }
 
-    private function processAttendance(?array $student, ?array $teacher, string $date, string $time): array {
+    // TYPE HINT DIHAPUS AGAR KEBAL FATAL ERROR
+    private function processAttendance($student, $teacher, string $date, string $time): array {
         $studentId = $student ? $student['id'] : null;
         $teacherId = $teacher ? $teacher['id'] : null;
         $classId   = $student ? $student['class_id'] : null;
 
-        // Cek record absensi
         if ($student) {
             $existingAtt = Database::fetch("SELECT id, time_in, time_out, status FROM attendances WHERE student_id = ? AND attendance_date = ?", [$studentId, $date]);
         } else {
             $existingAtt = Database::fetch("SELECT id, time_in, time_out, status FROM attendances WHERE teacher_id = ? AND attendance_date = ?", [$teacherId, $date]);
         }
+        $existingAtt = is_array($existingAtt) ? $existingAtt : null;
 
         $processed = false; $waQueued = false;
 
         $settingJamMasuk = Database::fetch("SELECT setting_value FROM school_settings WHERE setting_key = 'jam_masuk'");
         $settingToleransi = Database::fetch("SELECT setting_value FROM school_settings WHERE setting_key = 'toleransi_menit'");
-        $jamMasuk = trim($settingJamMasuk['setting_value'] ?? '07:00:00');
+        
+        $jamMasuk = (is_array($settingJamMasuk) && !empty($settingJamMasuk['setting_value'])) ? trim($settingJamMasuk['setting_value']) : '07:00:00';
         if (strlen($jamMasuk) === 5) $jamMasuk .= ':00';
         
-        $toleransi = (int)($settingToleransi['setting_value'] ?? 0);
+        $toleransi = (is_array($settingToleransi) && !empty($settingToleransi['setting_value'])) ? (int)$settingToleransi['setting_value'] : 0;
+        
         $timeMasukTimestamp = strtotime($date . ' ' . $jamMasuk);
         $timeBatasTimestamp = $timeMasukTimestamp + ($toleransi * 60);
         $timeScanTimestamp = strtotime($date . ' ' . $time);
 
         if (!$existingAtt) {
             $status = ($timeScanTimestamp <= $timeBatasTimestamp) ? 'hadir' : 'terlambat';
-            // Pastikan student_id dan teacher_id dikirim semua secara eksplisit
             $attendanceId = Database::insert('attendances', [
                 'student_id'      => $studentId,
                 'teacher_id'      => $teacherId,
@@ -173,15 +171,13 @@ class FingerprintService {
         return ['processed' => $processed, 'wa_queued' => $waQueued];
     }
 
-    private function enqueueWhatsapp(?array $student, ?array $teacher, string $date, string $time, string $status, string $type): bool {
+    private function enqueueWhatsapp($student, $teacher, string $date, string $time, string $status, string $type): bool {
         $recipients = [];
 
-        // 1. TENTUKAN PENERIMA BERDASARKAN ROLE
         if ($student) {
-            // Target Notifikasi Siswa -> Orang Tua & Siswa
             if (!empty($student['parent_id'])) {
                 $parent = Database::fetch("SELECT primary_whatsapp, father_whatsapp, mother_whatsapp, guardian_whatsapp, is_active FROM parents WHERE id = ?", [$student['parent_id']]);
-                if ($parent && ($parent['is_active'] ?? 1) == 1) {
+                if (is_array($parent) && ($parent['is_active'] ?? 1) == 1) {
                     if (!empty($parent['primary_whatsapp'])) $recipients[] = $parent['primary_whatsapp'];
                     if (!empty($parent['father_whatsapp']))  $recipients[] = $parent['father_whatsapp'];
                     if (!empty($parent['mother_whatsapp']))  $recipients[] = $parent['mother_whatsapp'];
@@ -190,23 +186,20 @@ class FingerprintService {
             if (!empty($student['whatsapp'])) $recipients[] = $student['whatsapp'];
             
         } else if ($teacher) {
-            // Target Notifikasi Guru -> Pimpinan (Kepala Sekolah)
             if (!empty($teacher['leader_id'])) {
                 $leader = Database::fetch("SELECT kepsek_wa, wakasek_wa, primary_whatsapp, is_active FROM leaders WHERE id = ?", [$teacher['leader_id']]);
-                if ($leader && ($leader['is_active'] ?? 1) == 1) {
+                if (is_array($leader) && ($leader['is_active'] ?? 1) == 1) {
                     if (!empty($leader['primary_whatsapp'])) $recipients[] = $leader['primary_whatsapp'];
                     if (!empty($leader['kepsek_wa'])) $recipients[] = $leader['kepsek_wa'];
                     if (!empty($leader['wakasek_wa'])) $recipients[] = $leader['wakasek_wa'];
                 }
             }
-            // Kirim ke nomor WA Guru itu sendiri
             $teacherData = Database::fetch("SELECT whatsapp FROM teachers WHERE id = ?", [$teacher['id']]);
-            if (!empty($teacherData['whatsapp'])) {
+            if (is_array($teacherData) && !empty($teacherData['whatsapp'])) {
                 $recipients[] = $teacherData['whatsapp'];
             }
         }
 
-        // 2. NORMALISASI NOMOR
         $normalizedPhones = [];
         foreach ($recipients as $rawPhone) {
             $cleaned = WhatsAppService::normalizePhone($rawPhone);
@@ -216,15 +209,14 @@ class FingerprintService {
         }
         if (empty($normalizedPhones)) return false;
 
-        // 3. AMBIL TEMPLATE
         if ($student) {
             $templateCode = ($type === 'masuk') ? (($status === 'terlambat') ? 'attendance_late' : 'ATTENDANCE_IN') : 'ATTENDANCE_OUT';
             $classRow = Database::fetch("SELECT name FROM classes WHERE id = ?", [$student['class_id']]);
-            $className = $classRow['name'] ?? '-';
+            $className = (is_array($classRow) && !empty($classRow['name'])) ? $classRow['name'] : '-';
             
             $template = Database::fetch("SELECT content FROM whatsapp_templates WHERE code = ? AND is_active = 1", [$templateCode]);
             
-            if (!$template) {
+            if (!is_array($template) || empty($template['content'])) {
                 $message = "Info Absensi: Siswa {$student['name']} (Kelas {$className}) telah melakukan absensi {$type} pada {$date} jam {$time}. Status: " . strtoupper($status);
             } else {
                 $message = str_replace(
@@ -237,7 +229,7 @@ class FingerprintService {
             $templateCode = ($type === 'masuk') ? 'TEACHER_IN' : 'TEACHER_OUT';
             $template = Database::fetch("SELECT content FROM whatsapp_templates WHERE code = ? AND is_active = 1", [$templateCode]);
             
-            if (!$template) {
+            if (!is_array($template) || empty($template['content'])) {
                 $message = "Laporan Kehadiran: Guru {$teacher['name']} telah melakukan absensi {$type} pada {$date} jam {$time} WIB.";
             } else {
                 $message = str_replace(
@@ -248,14 +240,11 @@ class FingerprintService {
             }
         }
 
-        // 4. MASUKKAN KE ANTREAN WA
         $queuedAny = false;
         foreach ($normalizedPhones as $phone) {
-            // Cek pencegahan duplikat spam di hari yang sama
             $existQueue = Database::fetch("SELECT id FROM whatsapp_queue WHERE phone = ? AND message = ? AND DATE(created_at) = ?", [$phone, $message, $date]);
 
             if (!$existQueue) {
-                // Perbaikan: student_id dan teacher_id didefinisikan semua agar tidak melanggar strict mode database
                 Database::insert('whatsapp_queue', [
                     'student_id'   => $student ? $student['id'] : null,
                     'teacher_id'   => $teacher ? $teacher['id'] : null,

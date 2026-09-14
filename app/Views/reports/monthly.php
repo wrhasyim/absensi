@@ -1,4 +1,40 @@
-<div class="card mb-3"><div class="card-body">
+<style>
+/* --- GAYA KHUSUS UNTUK CETAK (PRINT) --- */
+@media print {
+    .no-print, .navbar, .sidebar, .btn, footer {
+        display: none !important;
+    }
+    body, .main-content, .container, .container-fluid {
+        width: 100% !important; margin: 0 !important; padding: 0 !important;
+        background-color: #fff !important; box-shadow: none !important;
+    }
+    .card {
+        border: none !important; box-shadow: none !important;
+    }
+    .table {
+        width: 100% !important; border-collapse: collapse !important; margin-bottom: 20px !important;
+    }
+    .table th, .table td {
+        border: 1px solid #000 !important; padding: 8px !important; 
+        font-size: 12px !important; color: #000 !important;
+    }
+    .table th {
+        background-color: #f2f2f2 !important; 
+        -webkit-print-color-adjust: exact; 
+    }
+    .print-only {
+        display: block !important;
+    }
+}
+@media screen {
+    .print-only {
+        display: none !important;
+    }
+}
+</style>
+
+<!-- Form Filter (Disembunyikan saat dicetak) -->
+<div class="card mb-3 no-print"><div class="card-body">
 <form method="GET" class="d-flex gap-2 align-items-end">
   <div>
     <label class="form-label">Bulan</label>
@@ -18,6 +54,15 @@
 </form>
 </div></div>
 
+<!-- KOP SURAT (Hanya muncul saat dicetak) -->
+<div class="print-only" style="text-align: center; margin-bottom: 20px;">
+    <h3 style="margin: 0; font-size: 18px;">SMK TARUNA KARYA MANDIRI</h3>
+    <h2 style="margin: 5px 0; font-size: 22px;">REKAP KEHADIRAN BULANAN <?= strtoupper($role ?? 'siswa') ?></h2>
+    <p style="margin: 0; font-size: 14px;">Bulan: <?= date('F Y', strtotime(($month ?? date('Y-m')) . '-01')) ?></p>
+    <hr style="border: 1px solid #000; margin-top: 15px;">
+</div>
+
+<!-- Tabel Data -->
 <div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
 <thead>
   <tr>
@@ -50,3 +95,12 @@
 <?php endif; ?>
 </tbody>
 </table></div></div>
+
+<!-- TANDA TANGAN (Hanya muncul saat dicetak) -->
+<div class="print-only" style="width: 100%; margin-top: 40px; page-break-inside: avoid;">
+    <div style="float: right; text-align: center; width: 250px;">
+        <p style="margin-bottom: 70px;">Ciamis, <?= date('d F Y') ?><br>Kepala Sekolah,</p>
+        <p><strong>( .............................................. )</strong><br>NIP. ....................................</p>
+    </div>
+    <div style="clear: both;"></div>
+</div>
