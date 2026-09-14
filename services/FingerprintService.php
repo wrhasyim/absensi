@@ -162,16 +162,22 @@ class FingerprintService {
             if (!empty($student['whatsapp'])) $recipients[] = $student['whatsapp'];
             
         } else if ($teacher) {
-            // Target Notifikasi Guru -> Pimpinan (Kepsek, Wakasek, WA Utama)
+            // Target Notifikasi Guru -> Pimpinan (Kepala Sekolah)
             if (!empty($teacher['leader_id'])) {
                 $leader = Database::fetch("SELECT kepsek_wa, wakasek_wa, primary_whatsapp, is_active FROM leaders WHERE id = ?", [$teacher['leader_id']]);
                 if ($leader && ($leader['is_active'] ?? 1) == 1) {
+                    // Berdasarkan form "Edit Pimpinan", kita tarik primary_whatsapp (WA Utama) dan kepsek_wa
                     if (!empty($leader['primary_whatsapp'])) $recipients[] = $leader['primary_whatsapp'];
                     if (!empty($leader['kepsek_wa'])) $recipients[] = $leader['kepsek_wa'];
                     if (!empty($leader['wakasek_wa'])) $recipients[] = $leader['wakasek_wa'];
                 }
             }
-            if (!empty($teacher['whatsapp'])) $recipients[] = $teacher['whatsapp'];
+            // Hapus pengecekan kolom `phone` yang menyebabkan error sebelumnya.
+            // Gunakan kolom `whatsapp` milik guru jika ingin mengirim ke guru juga.
+            $teacherData = Database::fetch("SELECT whatsapp FROM teachers WHERE id = ?", [$teacher['id']]);
+            if (!empty($teacherData['whatsapp'])) {
+                $recipients[] = $teacherData['whatsapp'];
+            }
         }
 
         // 2. NORMALISASI NOMOR (Mencegah pengiriman ganda)
