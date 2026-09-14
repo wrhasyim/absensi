@@ -89,7 +89,7 @@ async function testDevice(id) {
 }
 
 async function syncDevice(id) { 
-  document.getElementById('sync-result').innerHTML = '<div class="alert alert-info"><span class="spinner-border spinner-border-sm me-2"></span>Menarik data dari mesin & memproses ke Monitor Absensi...</div>';
+  document.getElementById('sync-result').innerHTML = '<div class="alert alert-info"><span class="spinner-border spinner-border-sm me-2"></span>Menarik riwayat jam absensi terbaru dari mesin dan mencocokkan identitas...</div>';
   try {
     // 1. Ambil data log dari Mesin Fingerprint ke fingerprint_logs
     const r = await window.postJson('<?= url("/devices") ?>/' + id + '/sync');
@@ -103,7 +103,7 @@ async function syncDevice(id) {
       console.log('Sync absensi diproses otomatis via trigger backend');
     }
 
-    document.getElementById('sync-result').innerHTML = `<div class="alert alert-${r.success ? 'success' : 'danger'}"><b>Sync Berhasil:</b> ${r.message || 'Data berhasil ditarik'}${processResult}</div>`;
+    document.getElementById('sync-result').innerHTML = `<div class="alert alert-${r.success ? 'success' : 'danger'}"><b>Sinkronisasi Selesai:</b> Riwayat sidik jari berhasil ditarik dari mesin.<br><small>${r.message || 'Data berhasil ditarik'}</small> ${processResult}</div>`;
     
     setTimeout(() => location.reload(), 1500);
   } catch(err) {
