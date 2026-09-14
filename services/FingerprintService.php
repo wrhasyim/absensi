@@ -36,20 +36,34 @@ class FingerprintService {
             return ['success' => false, 'message' => 'Gagal terhubung ke perangkat fingerprint.'];
         }
 
+        // 1. Tambahkan waktu agar sistem tidak mati (Timeout) saat menyedot ribuan data
+        set_time_limit(300); 
+
         $logs = $adapter->getAttendanceLogs();
         $adapter->disconnect();
 
+        // 2. Cegah Error (Crash) jika mesin gagal mengirim data
+        if (!is_array($logs)) {
+            return ['success' => false, 'message' => 'Gagal menarik log. Koneksi terputus atau memori mesin X100C kepenuhan.'];
+        }
+
         $newLogsCount = 0; $duplicateLogsCount = 0; $attendancesProcessed = 0; $waQueueCount = 0;
+        $today = date('Y-m-d'); // Dapatkan tanggal hari ini
 
         foreach ($logs as $log) {
             $fpId = $log['fingerprint_id'] ?? null;
             $timestamp = $log['timestamp'] ?? null;
-            if (!$fpId || !$timestamp) continue;
+            
+            // 3. Abaikan data korup dengan tahun 0000-00-00
+            if (!$fpId || !$timestamp || $timestamp === '0000-00-00 00:00:00') continue;
 
-            $logDate = date('Y-m-d', strtotime($timestamp));
-            $logTime = date('H:i:s', strtotime($timestamp));
+            $parsedTime = strtotime($timestamp);
+            if (!$parsedTime) continue;
 
-            // 1. CEK STATUS: APAKAH INI SISWA ATAU GURU?
+            $logDate = date('Y-m-d', $parsedTime);
+            $logTime = date('H:i:s', $parsedTime);
+
+            // CEK STATUS: APAKAH INI SISWA ATAU GURU?
             $student = Database::fetch("SELECT id, class_id, name, whatsapp, parent_id FROM students WHERE fingerprint_id = ? AND status = 'aktif'", [$fpId]);
             $teacher = null;
             
@@ -58,13 +72,12 @@ class FingerprintService {
                 $teacher = Database::fetch("SELECT id, name, phone as whatsapp, leader_id FROM teachers WHERE fingerprint_id = ?", [$fpId]);
             }
 
-            // Abaikan log jika sidik jari tidak terdaftar sebagai siswa maupun guru
             if (!$student && !$teacher) continue;
 
             $studentId = $student ? $student['id'] : null;
             $teacherId = $teacher ? $teacher['id'] : null;
 
-            // 2. SIMPAN LOG
+            // SIMPAN LOG KE DALAM DATABASE
             $existingLog = Database::fetch("SELECT id FROM fingerprint_logs WHERE device_id = ? AND fingerprint_id = ? AND log_datetime = ?", [$this->device['id'], $fpId, $timestamp]);
 
             if (!$existingLog) {
@@ -73,27 +86,41 @@ class FingerprintService {
                     'student_id'     => $studentId,
                     'teacher_id'     => $teacherId,
                     'fingerprint_id' => $fpId,
+                    'log_date'       => $logDate, 
+                    'log_time'       => $logTime, 
                     'log_datetime'   => $timestamp,
                     'raw_data'       => $log['raw'] ?? null,
+                    'synced_at'      => date('Y-m-d H:i:s')
                 ]);
                 $newLogsCount++;
             } else {
                 $duplicateLogsCount++;
+                // Update synced_at meskipun duplikat agar kelihatan mesin masih berkomunikasi
+                Database::update('fingerprint_logs', ['synced_at' => date('Y-m-d H:i:s')], 'id = :id', ['id' => $existingLog['id']]);
             }
 
-            // 3. PROSES ABSENSI
-            $attResult = $this->processAttendance($student, $teacher, $logDate, $logTime);
-            if ($attResult['processed']) {
-                $attendancesProcessed++;
-                if ($attResult['wa_queued']) $waQueueCount++;
+            // PROSES ABSENSI & WHATSAPP - HANYA MEMPROSES UNTUK HARI INI
+            if ($logDate === $today) {
+                $attResult = $this->processAttendance($student, $teacher, $logDate, $logTime);
+                if ($attResult['processed']) {
+                    $attendancesProcessed++;
+                    if ($attResult['wa_queued']) $waQueueCount++;
+                }
             }
         }
 
+        // Update Waktu Last Sync secara paksa
         Database::update('devices', ['last_sync' => date('Y-m-d H:i:s'), 'status' => 'online'], 'id = :id', ['id' => $this->device['id']]);
 
         return [
             'success' => true,
-            'message' => "Berhasil: {$newLogsCount} log, {$duplicateLogsCount} duplikat, {$attendancesProcessed} absensi, {$waQueueCount} WA queue.",
+            'message' => "Berhasil: {$newLogsCount} log baru, {$duplicateLogsCount} duplikat, {$attendancesProcessed} absensi diproses, {$waQueueCount} pesan WA masuk antrean.",
+            'details' => [
+                'new_logs'              => $newLogsCount,
+                'duplicate_logs'        => $duplicateLogsCount,
+                'attendances_processed' => $attendancesProcessed,
+                'wa_queue_count'        => $waQueueCount
+            ]
         ];
     }
 
@@ -102,7 +129,7 @@ class FingerprintService {
         $teacherId = $teacher ? $teacher['id'] : null;
         $classId   = $student ? $student['class_id'] : null;
 
-        // Query berbeda tergantung dia siswa atau guru
+        // Cek record absensi
         if ($student) {
             $existingAtt = Database::fetch("SELECT id, time_in, time_out, status FROM attendances WHERE student_id = ? AND attendance_date = ?", [$studentId, $date]);
         } else {
@@ -123,6 +150,7 @@ class FingerprintService {
 
         if (!$existingAtt) {
             $status = ($timeScanTimestamp <= $timeBatasTimestamp) ? 'hadir' : 'terlambat';
+            // Pastikan student_id dan teacher_id dikirim semua secara eksplisit
             $attendanceId = Database::insert('attendances', [
                 'student_id'      => $studentId,
                 'teacher_id'      => $teacherId,
@@ -148,7 +176,7 @@ class FingerprintService {
     private function enqueueWhatsapp(?array $student, ?array $teacher, string $date, string $time, string $status, string $type): bool {
         $recipients = [];
 
-        // 1. TENTUKAN PENERIMA BERDASARKAN ROLE (Siswa / Guru)
+        // 1. TENTUKAN PENERIMA BERDASARKAN ROLE
         if ($student) {
             // Target Notifikasi Siswa -> Orang Tua & Siswa
             if (!empty($student['parent_id'])) {
@@ -166,21 +194,19 @@ class FingerprintService {
             if (!empty($teacher['leader_id'])) {
                 $leader = Database::fetch("SELECT kepsek_wa, wakasek_wa, primary_whatsapp, is_active FROM leaders WHERE id = ?", [$teacher['leader_id']]);
                 if ($leader && ($leader['is_active'] ?? 1) == 1) {
-                    // Berdasarkan form "Edit Pimpinan", kita tarik primary_whatsapp (WA Utama) dan kepsek_wa
                     if (!empty($leader['primary_whatsapp'])) $recipients[] = $leader['primary_whatsapp'];
                     if (!empty($leader['kepsek_wa'])) $recipients[] = $leader['kepsek_wa'];
                     if (!empty($leader['wakasek_wa'])) $recipients[] = $leader['wakasek_wa'];
                 }
             }
-            // Hapus pengecekan kolom `phone` yang menyebabkan error sebelumnya.
-            // Gunakan kolom `whatsapp` milik guru jika ingin mengirim ke guru juga.
+            // Kirim ke nomor WA Guru itu sendiri
             $teacherData = Database::fetch("SELECT whatsapp FROM teachers WHERE id = ?", [$teacher['id']]);
             if (!empty($teacherData['whatsapp'])) {
                 $recipients[] = $teacherData['whatsapp'];
             }
         }
 
-        // 2. NORMALISASI NOMOR (Mencegah pengiriman ganda)
+        // 2. NORMALISASI NOMOR
         $normalizedPhones = [];
         foreach ($recipients as $rawPhone) {
             $cleaned = WhatsAppService::normalizePhone($rawPhone);
@@ -190,9 +216,8 @@ class FingerprintService {
         }
         if (empty($normalizedPhones)) return false;
 
-        // 3. AMBIL TEMPLATE SESUAI ROLE
+        // 3. AMBIL TEMPLATE
         if ($student) {
-            // Template Siswa
             $templateCode = ($type === 'masuk') ? (($status === 'terlambat') ? 'attendance_late' : 'ATTENDANCE_IN') : 'ATTENDANCE_OUT';
             $classRow = Database::fetch("SELECT name FROM classes WHERE id = ?", [$student['class_id']]);
             $className = $classRow['name'] ?? '-';
@@ -200,7 +225,7 @@ class FingerprintService {
             $template = Database::fetch("SELECT content FROM whatsapp_templates WHERE code = ? AND is_active = 1", [$templateCode]);
             
             if (!$template) {
-                $message = "Info Absensi: Siswa {$student['name']} (Kelas {$className}) telah absensi {$type} pada {$date} jam {$time}. Status: " . strtoupper($status);
+                $message = "Info Absensi: Siswa {$student['name']} (Kelas {$className}) telah melakukan absensi {$type} pada {$date} jam {$time}. Status: " . strtoupper($status);
             } else {
                 $message = str_replace(
                     ['{nama_siswa}', '{kelas}', '{tanggal}', '{jam}', '{status}', '{tipe}'],
@@ -209,7 +234,6 @@ class FingerprintService {
                 );
             }
         } else {
-            // Template Guru
             $templateCode = ($type === 'masuk') ? 'TEACHER_IN' : 'TEACHER_OUT';
             $template = Database::fetch("SELECT content FROM whatsapp_templates WHERE code = ? AND is_active = 1", [$templateCode]);
             
@@ -224,18 +248,17 @@ class FingerprintService {
             }
         }
 
-        // 4. MASUKKAN KE ANTARAAN WA
+        // 4. MASUKKAN KE ANTREAN WA
         $queuedAny = false;
         foreach ($normalizedPhones as $phone) {
             // Cek pencegahan duplikat spam di hari yang sama
-            $idField = $student ? 'student_id' : 'teacher_id';
-            $idVal   = $student ? $student['id'] : $teacher['id'];
-            
-            $existQueue = Database::fetch("SELECT id FROM whatsapp_queue WHERE phone = ? AND message = ? AND created_at LIKE ?", [$phone, $message, $date . '%']);
+            $existQueue = Database::fetch("SELECT id FROM whatsapp_queue WHERE phone = ? AND message = ? AND DATE(created_at) = ?", [$phone, $message, $date]);
 
             if (!$existQueue) {
+                // Perbaikan: student_id dan teacher_id didefinisikan semua agar tidak melanggar strict mode database
                 Database::insert('whatsapp_queue', [
-                    $idField       => $idVal,
+                    'student_id'   => $student ? $student['id'] : null,
+                    'teacher_id'   => $teacher ? $teacher['id'] : null,
                     'phone'        => $phone,
                     'message'      => $message,
                     'status'       => 'pending',
