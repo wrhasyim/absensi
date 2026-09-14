@@ -225,7 +225,7 @@ class FingerprintService {
             $idField = $student ? 'student_id' : 'teacher_id';
             $idVal   = $student ? $student['id'] : $teacher['id'];
             
-            $existQueue = Database::fetch("SELECT id FROM whatsapp_queue WHERE phone = ? AND message = ? AND DATE(created_at) = ?", [$phone, $message, $date]);
+            $existQueue = Database::fetch("SELECT id FROM whatsapp_queue WHERE phone = ? AND message = ? AND created_at LIKE ?", [$phone, $message, $date . '%']);
 
             if (!$existQueue) {
                 Database::insert('whatsapp_queue', [

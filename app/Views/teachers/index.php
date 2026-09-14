@@ -8,7 +8,7 @@
 <tr>
   <td>
     <?= e($t['nip']) ?><br>
-    <small class="text-muted">FP ID: <?= e($t['fingerprint_id'] ?: '-') ?></small>
+    <small class="text-info">FP ID: <?= e($t['fingerprint_id'] ?: '-') ?></small>
   </td>
   <td><?= e($t['name']) ?></td>
   <td><?= $t['gender']=='L'?'L':'P' ?></td>
