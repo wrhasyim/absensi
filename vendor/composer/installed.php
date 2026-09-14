@@ -3,7 +3,7 @@
         'name' => 'absensi/sekolah',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'bbfd50a3dba767b2ac3c2622c3e0ed6a45cf2f29',
+        'reference' => '308d00680413088c6fc7803b975bae5a9abbf701',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         'absensi/sekolah' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'bbfd50a3dba767b2ac3c2622c3e0ed6a45cf2f29',
+            'reference' => '308d00680413088c6fc7803b975bae5a9abbf701',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

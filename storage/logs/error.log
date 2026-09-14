@@ -2,3 +2,4 @@
 [2026-09-01 13:31:50] DB Connection: SQLSTATE[HY000] [1045] Access denied for user 'absensi'@'localhost' (using password: YES)
 [2026-09-02 06:21:24] DB Connection: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it
 [2026-09-07 16:39:53] DB Connection: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it
+[2026-09-12 07:50:24] DB Connection: could not find driver
