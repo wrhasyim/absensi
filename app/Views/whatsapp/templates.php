@@ -1,5 +1,9 @@
 <?php use App\Core\Csrf; ?>
-<div class="alert alert-info small"><b>Variabel tersedia:</b> {nama_siswa}, {kelas}, {tanggal}, {jam}, {status}</div>
+<div class="alert alert-info small">
+    <div class="mb-1"><b>Variabel Siswa:</b> <code>{nama_siswa}</code>, <code>{kelas}</code>, <code>{tanggal}</code>, <code>{jam}</code>, <code>{status}</code>, <code>{tipe}</code></div>
+    <div><b>Variabel Guru:</b> <code>{nama_guru}</code>, <code>{tanggal}</code>, <code>{jam}</code>, <code>{tipe}</code></div>
+</div>
+
 <div class="row g-3">
 <?php foreach($templates as $t): ?>
 <div class="col-md-6"><div class="card"><div class="card-header d-flex justify-content-between"><span><code><?= e($t['code']) ?></code> — <?= e($t['name']) ?></span>

@@ -73,12 +73,18 @@ class WhatsappController extends Controller {
         $status = $this->input('status','');
         $where = "1=1"; $params=[];
         if ($status) { $where.=" AND wq.status=?"; $params[]=$status; }
+        
+        // Menggunakan COALESCE untuk menarik nama Siswa atau Guru, serta mendeteksi rolenya
         $rows = Database::fetchAll("
-            SELECT wq.*, s.name student_name
+            SELECT wq.*, 
+                   COALESCE(s.name, t.name) as student_name,
+                   CASE WHEN wq.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as target_role
             FROM whatsapp_queue wq
             LEFT JOIN students s ON s.id=wq.student_id
+            LEFT JOIN teachers t ON t.id=wq.teacher_id
             WHERE $where ORDER BY wq.id DESC LIMIT 200
         ", $params);
+        
         $this->view('whatsapp.queue', compact('rows','status') + ['title'=>'Queue Pesan']);
     }
 

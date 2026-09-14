@@ -130,7 +130,11 @@ class StudentController extends Controller {
                         $class_id = null;
                         if (!empty($input_kelas)) {
                             $kelasData = Database::fetch("SELECT id FROM classes WHERE name LIKE ? OR id = ?", ["%$input_kelas%", $input_kelas]);
-                            if ($kelasData) { $class_id = $kelasData['id']; }
+                            if ($kelasData) { 
+                                $class_id = $kelasData['id']; 
+                            } else {
+                                throw new \Exception("Teks Kelas '{$input_kelas}' tidak ditemukan di database.");
+                            }
                         }
 
                         // Pencocokan otomatis Jurusan
@@ -138,39 +142,77 @@ class StudentController extends Controller {
                         $major_id = null;
                         if (!empty($input_jurusan)) {
                             $jurusanData = Database::fetch("SELECT id FROM majors WHERE name LIKE ? OR code LIKE ? OR id = ?", ["%$input_jurusan%", "%$input_jurusan%", $input_jurusan]);
-                            if ($jurusanData) { $major_id = $jurusanData['id']; }
+                            if ($jurusanData) { 
+                                $major_id = $jurusanData['id']; 
+                            } else {
+                                throw new \Exception("Teks Jurusan '{$input_jurusan}' tidak ditemukan di database.");
+                            }
                         }
+
+                        // Fungsi pintar untuk mendeteksi dan merapikan format nomor WA
+                        $formatNomor = function($nomor) {
+                            $nomor = trim($nomor);
+                            if (empty($nomor)) return '';
+                            
+                            // Bersihkan karakter selain angka dan tanda plus
+                            $nomor = preg_replace('/[^0-9+]/', '', $nomor);
+                            if (empty($nomor)) return '';
+
+                            // Jika user typo mengetik +62085... jadikan +6285...
+                            if (str_starts_with($nomor, '+620')) {
+                                $nomor = '+62' . substr($nomor, 4);
+                            }
+                            if (str_starts_with($nomor, '620')) {
+                                $nomor = '62' . substr($nomor, 3);
+                            }
+
+                            // Jika diawali 0, ganti dengan 62
+                            if (str_starts_with($nomor, '0')) {
+                                $nomor = '62' . substr($nomor, 1);
+                            }
+                            
+                            // Jika lupa ketik 0 (misal nulis 8123...), asumsikan nomor Indo tambahkan 62
+                            // (Tapi jika nomor luar, biasanya tidak diawali 8. Nomor Indo pasti 8xx)
+                            if (str_starts_with($nomor, '8') && strlen($nomor) >= 9) {
+                                $nomor = '62' . $nomor;
+                            }
+
+                            // Hilangkan tanda plus (+) agar sesuai standar Gateway WA yang murni angka
+                            $nomor = str_replace('+', '', $nomor);
+
+                            return $nomor;
+                        };
 
                         $fingerprint_id = trim($sheetData[$i]['K'] ?? '') ?: null;
                         $status_siswa = trim($sheetData[$i]['L'] ?? '') ?: 'aktif';
                         $phone = trim($sheetData[$i]['M'] ?? '');
-                        $whatsapp = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['N'] ?? ''));
+                        $whatsapp = $formatNomor($sheetData[$i]['N'] ?? '');
                         $address = trim($sheetData[$i]['O'] ?? '');
 
                         // Data Orang Tua
                         $father_name = trim($sheetData[$i]['P'] ?? '');
-                        $father_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['Q'] ?? ''));
+                        $father_wa = $formatNomor($sheetData[$i]['Q'] ?? '');
                         $mother_name = trim($sheetData[$i]['R'] ?? '');
-                        $mother_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['S'] ?? ''));
+                        $mother_wa = $formatNomor($sheetData[$i]['S'] ?? '');
                         $guardian_name = trim($sheetData[$i]['T'] ?? '');
-                        $guardian_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['U'] ?? ''));
-                        $primary_wa = \App\Services\WhatsAppService::normalizePhone(trim($sheetData[$i]['V'] ?? ''));
+                        $guardian_wa = $formatNomor($sheetData[$i]['U'] ?? '');
+                        $primary_wa = $formatNomor($sheetData[$i]['V'] ?? '');
                         $relation = trim($sheetData[$i]['W'] ?? '') ?: 'Orang Tua';
+                        
+                        // Status Ortu menggunakan is_active (1 = Aktif, 0 = Nonaktif)
                         $is_active_ortu = (strtolower(trim($sheetData[$i]['X'] ?? '')) === 'nonaktif') ? 0 : 1;
 
                         $parent_id = null;
 
-                        // Cek dan Simpan / Hubungkan Data Orang Tua
+                        // Jika WA Utama diisi, coba insert tabel parents
                         if (!empty($primary_wa)) {
                             try {
-                                // Cek apakah nomor WA utama sudah terdaftar di tabel parents
+                                // Cek apakah WA Utama sudah ada untuk mencegah duplikasi ortu
                                 $existingParent = Database::fetch("SELECT id FROM parents WHERE primary_whatsapp = ?", [$primary_wa]);
                                 
                                 if ($existingParent) {
-                                    // Jika sudah ada, gunakan ID yang lama
                                     $parent_id = $existingParent['id'];
                                 } else {
-                                    // Jika belum ada, buat baru
                                     $parent_id = Database::insert('parents', [
                                         'father_name' => $father_name,
                                         'father_whatsapp' => $father_wa,
@@ -184,7 +226,7 @@ class StudentController extends Controller {
                                     ]);
                                 }
                             } catch (\Throwable $e) {
-                                $lastError = "Ortu: " . $e->getMessage();
+                                throw new \Exception("Gagal menyimpan Ortu: " . $e->getMessage());
                             }
                         }
 
@@ -224,7 +266,7 @@ class StudentController extends Controller {
                     }
                     
                 } catch (\Throwable $e) {
-                    flash('error', "Terjadi kesalahan sistem saat membaca file: " . $e->getMessage());
+                    flash('error', "Terjadi kesalahan sistem: " . $e->getMessage());
                 }
             } else {
                 flash('error', "Format file tidak didukung. Harap gunakan format .xlsx atau .xls");

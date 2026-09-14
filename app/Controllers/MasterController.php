@@ -52,22 +52,40 @@ class MasterController extends Controller {
     // ===== Teachers =====
     public function teachersIndex() {
         Auth::require();
-        $teachers = Database::fetchAll("SELECT * FROM teachers ORDER BY name");
-        $this->view('teachers.index', compact('teachers') + ['title'=>'Data Guru']);
+        // Tarik data guru beserta nama pimpinannya
+        $teachers = Database::fetchAll("
+            SELECT t.*, l.kepsek_name 
+            FROM teachers t 
+            LEFT JOIN leaders l ON l.id = t.leader_id 
+            ORDER BY t.name
+        ");
+        
+        // Tarik data pimpinan yang aktif untuk dropdown
+        $leaders = Database::fetchAll("SELECT * FROM leaders WHERE is_active = 1 ORDER BY kepsek_name");
+        
+        $this->view('teachers.index', compact('teachers', 'leaders') + ['title'=>'Data Guru']);
     }
+    
     public function teacherStore() {
         Auth::require(['super_admin','admin']); Csrf::verify();
         $id = $this->input('id');
         $data = [
-            'nip'=>trim($this->input('nip','')),'name'=>trim($this->input('name','')),
-            'gender'=>$this->input('gender','L'),'phone'=>trim($this->input('phone','')),
+            'nip'=>trim($this->input('nip','')),
+            'name'=>trim($this->input('name','')),
+            'gender'=>$this->input('gender','L'),
+            'phone'=>trim($this->input('phone','')),
             'whatsapp'=>\App\Services\WhatsAppService::normalizePhone($this->input('whatsapp','')),
-            'email'=>trim($this->input('email','')),'address'=>trim($this->input('address','')),
+            'email'=>trim($this->input('email','')),
+            'address'=>trim($this->input('address','')),
+            // Tambahan kolom baru untuk sinkronisasi absensi dan notifikasi
+            'fingerprint_id'=>trim($this->input('fingerprint_id','')) ?: null,
+            'leader_id'=>$this->input('leader_id') ?: null,
         ];
         if ($id) Database::update('teachers',$data,'id=:id',['id'=>$id]);
         else Database::insert('teachers',$data);
         flash('success','Guru disimpan.'); redirect('/teachers');
     }
+    
     public function teacherDelete($id) {
         Auth::require(['super_admin','admin']); Csrf::verify();
         Database::query("DELETE FROM teachers WHERE id=?", [$id]);

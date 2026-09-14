@@ -26,6 +26,7 @@
       <a href="<?= url('/students') ?>" data-testid="nav-students"><i class="bi bi-people"></i> Data Siswa</a>
       <a href="<?= url('/parents') ?>" data-testid="nav-parents"><i class="bi bi-person-hearts"></i> Data Orang Tua</a>
       <a href="<?= url('/teachers') ?>" data-testid="nav-teachers"><i class="bi bi-person-workspace"></i> Data Guru</a>
+      <a href="<?= url('/leaders') ?>" data-testid="nav-leaders"><i class="bi bi-person-badge"></i> Data Pimpinan</a>
       <a href="<?= url('/classes') ?>" data-testid="nav-classes"><i class="bi bi-building"></i> Data Kelas</a>
       <a href="<?= url('/majors') ?>" data-testid="nav-majors"><i class="bi bi-bookmark-star"></i> Data Jurusan</a>
       <div class="nav-group">Absensi</div>
