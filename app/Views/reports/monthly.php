@@ -1,29 +1,45 @@
 <style>
-/* --- GAYA KHUSUS UNTUK CETAK (PRINT) --- */
+/* --- GAYA KHUSUS UNTUK CETAK (PRINT) POLOSAN --- */
 @media print {
-    .no-print, .navbar, .sidebar, .btn, footer {
+    .no-print, .navbar, .sidebar, .btn, footer, header {
         display: none !important;
     }
-    body, .main-content, .container, .container-fluid {
-        width: 100% !important; margin: 0 !important; padding: 0 !important;
-        background-color: #fff !important; box-shadow: none !important;
-    }
-    .card {
-        border: none !important; box-shadow: none !important;
+    body, .main-content, .container, .container-fluid, .card, .card-body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
     }
     .table {
-        width: 100% !important; border-collapse: collapse !important; margin-bottom: 20px !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin-bottom: 20px !important;
+        background-color: #ffffff !important;
     }
     .table th, .table td {
-        border: 1px solid #000 !important; padding: 8px !important; 
-        font-size: 12px !important; color: #000 !important;
+        border: 1px solid #000000 !important;
+        padding: 8px !important; 
+        color: #000000 !important;
+        background-color: #ffffff !important;
+        /* Rata Tengah Vertikal dan Horizontal */
+        vertical-align: middle !important; 
+        text-align: center !important;     
     }
-    .table th {
-        background-color: #f2f2f2 !important; 
-        -webkit-print-color-adjust: exact; 
+    /* Pengecualian: Kolom ke-2 (Nama Lengkap) tetap Rata Kiri */
+    .table th:nth-child(2), 
+    .table td:nth-child(2) {
+        text-align: left !important;
     }
     .print-only {
         display: block !important;
+        color: #000000 !important;
+    }
+    /* Memaksa class warna teks menjadi hitam saat dicetak */
+    .text-success, .text-warning, .text-danger {
+        color: #000000 !important;
     }
 }
 @media screen {
@@ -33,7 +49,6 @@
 }
 </style>
 
-<!-- Form Filter (Disembunyikan saat dicetak) -->
 <div class="card mb-3 no-print"><div class="card-body">
 <form method="GET" class="d-flex gap-2 align-items-end">
   <div>
@@ -59,11 +74,10 @@
     <h3 style="margin: 0; font-size: 18px;">SMK TARUNA KARYA MANDIRI</h3>
     <h2 style="margin: 5px 0; font-size: 22px;">REKAP KEHADIRAN BULANAN <?= strtoupper($role ?? 'siswa') ?></h2>
     <p style="margin: 0; font-size: 14px;">Bulan: <?= date('F Y', strtotime(($month ?? date('Y-m')) . '-01')) ?></p>
-    <hr style="border: 1px solid #000; margin-top: 15px;">
+    <hr style="border-top: 1px solid #000; margin-top: 15px;">
 </div>
 
-<!-- Tabel Data -->
-<div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
+<div class="card"><div class="table-responsive"><table class="table mb-0 align-middle">
 <thead>
   <tr>
     <th><?= ($role ?? 'siswa') === 'guru' ? 'NIP' : 'NIS' ?></th>
@@ -91,15 +105,15 @@
   </tr>
   <?php endforeach; ?>
 <?php else: ?>
-  <tr><td colspan="8" class="text-center py-4 text-muted">Data absensi tidak ditemukan pada bulan ini.</td></tr>
+  <tr><td colspan="8" class="text-center py-4">Data absensi tidak ditemukan pada bulan ini.</td></tr>
 <?php endif; ?>
 </tbody>
 </table></div></div>
 
-<!-- TANDA TANGAN (Hanya muncul saat dicetak) -->
-<div class="print-only" style="width: 100%; margin-top: 40px; page-break-inside: avoid;">
+<!-- TANDA TANGAN DI KARAWANG -->
+<div class="print-only" style="width: 100%; margin-top: 10px; page-break-inside: avoid;">
     <div style="float: right; text-align: center; width: 250px;">
-        <p style="margin-bottom: 70px;">Ciamis, <?= date('d F Y') ?><br>Kepala Sekolah,</p>
+        <p style="margin-bottom: 70px;">Karawang, <?= date('d F Y') ?><br>Kepala Sekolah,</p>
         <p><strong>( .............................................. )</strong><br>NIP. ....................................</p>
     </div>
     <div style="clear: both;"></div>
