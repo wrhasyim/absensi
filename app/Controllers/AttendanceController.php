@@ -10,12 +10,12 @@ class AttendanceController extends Controller {
     public function monitor() {
         Auth::require();
         $today = date('Y-m-d');
-        // COALESCE digunakan untuk menggabungkan nama Guru dan Siswa dalam satu kolom
         $rows = Database::fetchAll("
             SELECT a.*, 
                    COALESCE(s.name, t.name) as user_name, 
                    COALESCE(s.nis, '-') as identifier, 
-                   c.name class_name, d.name device_name,
+                   COALESCE(c.name, 'Guru / Staff') as class_name, 
+                   d.name device_name,
                    CASE WHEN a.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as role,
                    (SELECT status FROM whatsapp_queue wq WHERE (wq.student_id=a.student_id OR wq.teacher_id=a.teacher_id) AND DATE(wq.created_at)=a.attendance_date ORDER BY wq.id DESC LIMIT 1) wa_status
             FROM attendances a
@@ -36,7 +36,8 @@ class AttendanceController extends Controller {
             SELECT a.time_in, a.status, 
                    COALESCE(s.name, t.name) as user_name, 
                    COALESCE(s.nis, '-') as identifier, 
-                   c.name class_name, d.name device_name,
+                   COALESCE(c.name, 'Guru / Staff') as class_name, 
+                   d.name device_name,
                    CASE WHEN a.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as role,
                    (SELECT status FROM whatsapp_queue wq WHERE (wq.student_id=a.student_id OR wq.teacher_id=a.teacher_id) AND DATE(wq.created_at)=a.attendance_date ORDER BY wq.id DESC LIMIT 1) wa_status
             FROM attendances a
@@ -62,7 +63,7 @@ class AttendanceController extends Controller {
             SELECT a.*, 
                    COALESCE(s.name, t.name) as user_name, 
                    COALESCE(s.nis, '-') as identifier, 
-                   c.name class_name,
+                   COALESCE(c.name, 'Guru / Staff') as class_name,
                    CASE WHEN a.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as role
             FROM attendances a
             LEFT JOIN students s ON s.id=a.student_id
@@ -78,11 +79,11 @@ class AttendanceController extends Controller {
     public function permitCreate() {
         Auth::require(['super_admin','admin','guru']);
         $students = Database::fetchAll("SELECT id, name, nis as identifier, 'S_Siswa' as role FROM students WHERE status='aktif'");
-        $teachers = Database::fetchAll("SELECT id, name, '-' as identifier, 'T_Guru' as role FROM teachers");
         
-        // Gabungkan array untuk ditampilkan di satu dropdown (pastikan view-nya menyesuaikan 'user_id' menjadi value seperti S_1 atau T_1)
+        // Ubah '-' menjadi nip agar tampil rapi di dropdown
+        $teachers = Database::fetchAll("SELECT id, name, nip as identifier, 'T_Guru' as role FROM teachers");
+        
         $users = array_merge($students, $teachers);
-        // Sort by name
         usort($users, fn($a, $b) => strcmp($a['name'], $b['name']));
         
         $this->view('attendance.permit', compact('users') + ['title'=>'Input Izin/Sakit']);

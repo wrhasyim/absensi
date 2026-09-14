@@ -62,9 +62,19 @@ class DeviceController extends Controller {
     public function logs() {
         Auth::require();
         $logs = Database::fetchAll("
-            SELECT fl.*, s.name student_name, d.name device_name
+            SELECT fl.*, 
+                   DATE(fl.log_datetime) as log_date,
+                   TIME(fl.log_datetime) as log_time,
+                   COALESCE(s.name, t.name) as user_name,
+                   CASE 
+                       WHEN s.id IS NOT NULL THEN CONCAT('Siswa (NIS: ', COALESCE(s.nis, '-'), ')') 
+                       WHEN t.id IS NOT NULL THEN CONCAT('Guru (NIP: ', COALESCE(t.nip, '-'), ')') 
+                       ELSE 'Tidak dikenal' 
+                   END as user_role,
+                   d.name device_name
             FROM fingerprint_logs fl
             LEFT JOIN students s ON s.id=fl.student_id
+            LEFT JOIN teachers t ON t.id=fl.teacher_id
             LEFT JOIN devices d ON d.id=fl.device_id
             ORDER BY fl.log_datetime DESC LIMIT 200
         ");
