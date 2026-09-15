@@ -8,7 +8,8 @@
 <?php foreach($rows as $r): ?>
 <tr>
   <td><?= e(substr($r['time_in'] ?? '', 0, 5)) ?></td>
-  <td><?= e($r['identifier']) ?></td>
+  <!-- Perbaikan di PHP render awal -->
+  <td><?= e($r['identifier'] ?? $r['nis'] ?? $r['nip'] ?? '-') ?></td>
   <td>
     <?= e($r['user_name']) ?>
     <span class="badge <?= $r['role'] == 'Guru' ? 'bg-primary' : 'bg-secondary' ?>"><?= e($r['role']) ?></span>
@@ -25,6 +26,8 @@
 <script>
 let isSyncing = false;
 
+// Note: Karena Anda sudah pakai PM2, fungsi auto-sync via web ini sebenarnya 
+// opsional. Anda bisa membiarkannya saja atau menghapusnya nanti jika tidak butuh.
 async function triggerAutoSync() {
   if (isSyncing) return;
   isSyncing = true;
@@ -53,7 +56,8 @@ async function refreshMonitor(){
     }
     tb.innerHTML = j.data.map(x=>`<tr>
       <td>${(x.time_in||'').substring(0,5)}</td>
-      <td>${x.identifier}</td>
+      <!-- Perbaikan di JavaScript AJAX Render -->
+      <td>${x.identifier || x.nis || x.nip || '-'}</td>
       <td>
           ${x.user_name}
           <span class="badge ${x.role == 'Guru' ? 'bg-primary' : 'bg-secondary'}">${x.role}</span>

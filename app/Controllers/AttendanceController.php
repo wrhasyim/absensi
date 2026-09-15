@@ -13,7 +13,7 @@ class AttendanceController extends Controller {
         $rows = Database::fetchAll("
             SELECT a.*, 
                    COALESCE(s.name, t.name) as user_name, 
-                   COALESCE(s.nis, '-') as identifier, 
+                   COALESCE(s.nis, t.nip, '-') as identifier, 
                    COALESCE(c.name, 'Guru / Staff') as class_name, 
                    d.name device_name,
                    CASE WHEN a.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as role,
@@ -35,7 +35,7 @@ class AttendanceController extends Controller {
         $rows = Database::fetchAll("
             SELECT a.time_in, a.status, 
                    COALESCE(s.name, t.name) as user_name, 
-                   COALESCE(s.nis, '-') as identifier, 
+                   COALESCE(s.nis, t.nip, '-') as identifier, 
                    COALESCE(c.name, 'Guru / Staff') as class_name, 
                    d.name device_name,
                    CASE WHEN a.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as role,
@@ -62,7 +62,7 @@ class AttendanceController extends Controller {
         $rows = Database::fetchAll("
             SELECT a.*, 
                    COALESCE(s.name, t.name) as user_name, 
-                   COALESCE(s.nis, '-') as identifier, 
+                   COALESCE(s.nis, t.nip, '-') as identifier, 
                    COALESCE(c.name, 'Guru / Staff') as class_name,
                    CASE WHEN a.student_id IS NOT NULL THEN 'Siswa' ELSE 'Guru' END as role
             FROM attendances a

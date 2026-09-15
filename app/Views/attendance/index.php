@@ -12,7 +12,8 @@
 <tbody data-testid="attendance-body">
 <?php foreach($rows as $r): ?>
 <tr>
-  <td><?= e($r['identifier']) ?></td>
+  <!-- Perbaikan fallback pengecekan identifier, nis, atau nip -->
+  <td><?= e($r['identifier'] ?? $r['nis'] ?? $r['nip'] ?? '-') ?></td>
   <td>
     <?= e($r['user_name']) ?>
     <span class="badge <?= $r['role'] == 'Guru' ? 'bg-primary' : 'bg-secondary' ?>"><?= e($r['role']) ?></span>
@@ -21,7 +22,7 @@
   <td><?= e(substr($r['time_in'] ?? '',0,5)) ?: '-' ?></td>
   <td><?= e(substr($r['time_out'] ?? '',0,5)) ?: '-' ?></td>
   <td><span class="badge-status st-<?= e($r['status']) ?>"><?= strtoupper($r['status']) ?></span></td>
-  <td><?= e($r['note']) ?></td>
+  <td><?= e($r['note'] ?? '-') ?></td>
 </tr>
 <?php endforeach; if (empty($rows)): ?><tr><td colspan="7" class="text-center py-4 text-muted">Tidak ada data.</td></tr><?php endif; ?>
 </tbody></table></div></div>
